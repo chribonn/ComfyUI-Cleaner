@@ -1,0 +1,79 @@
+# ComfyUI-Cleaner - models that no workflow uses
+# Created 2026-11-01 15:53 for D:\ComfyUI-Easy-Install\ComfyUI\models
+#
+# delete_unused_models.py deletes every line below that does NOT start with '#'.
+# To keep a model: delete its line, or put '#' in front of it.
+# Models that could not be verified online start with '#' (kept). Remove the '#'
+# to delete them anyway. 'custom node' marks models a custom node may load by
+# itself without naming them in the workflow - check those before deleting.
+#
+# Selected: 22 of 23 unused models, 149.85 GB
+
+# 27.14 GB | file | HF: Lightricks/LTX-2.3-fp8 | https://huggingface.co/Lightricks/LTX-2.3-fp8/resolve/main/ltx-2.3-22b-dev-fp8.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\checkpoints\ltx-2.3-22b-dev-fp8.safetensors
+
+# 22.17 GB | file | HF: Comfy-Org/Flux-1-Dev | https://huggingface.co/Comfy-Org/Flux-1-Dev/resolve/main/split_files/diffusion_models/flux1-fill-dev.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\diffusion_models\flux1-fill-dev.safetensors
+
+# 10.56 GB | file | HF: city96/Wan2.1-I2V-14B-480P-gguf | https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/resolve/main/wan2.1-i2v-14b-480p-Q4_K_M.gguf
+D:\ComfyUI-Easy-Install\ComfyUI\models\diffusion_models\wan2.1-i2v-14b-480p-Q4_K_M.gguf
+
+# 13.31 GB | file | HF: Comfy-Org/Wan-2.2 | https://huggingface.co/Comfy-Org/Wan-2.2/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\diffusion_models\wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+
+# 13.31 GB | file | HF: Comfy-Org/Wan-2.2 | https://huggingface.co/Comfy-Org/Wan-2.2/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\diffusion_models\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+
+# 4.77 GB | file | HF: Kijai/WanVideo_comfy | https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/InfiniteTalk/Wan2_1-InfiniTetalk-Single_fp16.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\diffusion_models\Wan2_1-InfiniTetalk-Single_fp16.safetensors
+
+# 1.31 GB | file | HF: Kijai/WanVideo_comfy_GGUF | https://huggingface.co/Kijai/WanVideo_comfy_GGUF/resolve/main/InfiniteTalk/Wan2_1-InfiniteTalk_Single_Q4_K_M.gguf
+D:\ComfyUI-Easy-Install\ComfyUI\models\diffusion_models\Wan2_1-InfiniteTalk_Single_Q4_K_M.gguf
+
+# 11.46 GB | file | HF: Comfy-Org/Z-Image-Turbo | https://huggingface.co/Comfy-Org/Z-Image-Turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\diffusion_models\z_image_turbo_bf16.safetensors
+
+# 949.62 MB | file | HF: Lightricks/LTX-2.3 | https://huggingface.co/Lightricks/LTX-2.3/resolve/main/ltx-2.3-spatial-upscaler-x2-1.1.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors
+
+# 599.10 MB | file | HF: Comfy-Org/ltx-2 | https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/loras/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\loras\gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors
+
+# 703.82 MB | file | HF: Comfy-Org/Wan-Animate-2 | https://huggingface.co/Comfy-Org/Wan-Animate-2/resolve/main/loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\loras\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors
+
+# 2.55 GB | file | HF: Comfy-Org/ltx-2.3 | https://huggingface.co/Comfy-Org/ltx-2.3/resolve/main/split_files/loras/ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\loras\ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors
+
+# 4.23 GB | folder | HF: Qwen/Qwen3-TTS-12Hz-1.7B-Base | custom node | https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base
+D:\ComfyUI-Easy-Install\ComfyUI\models\qwen-tts\Qwen3-TTS-12Hz-1.7B-Base
+
+# 4.21 GB | folder | HF: Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice | custom node | https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
+D:\ComfyUI-Easy-Install\ComfyUI\models\qwen-tts\Qwen3-TTS-12Hz-1.7B-CustomVoice
+
+# 4.21 GB | folder | HF: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign | custom node | https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+D:\ComfyUI-Easy-Install\ComfyUI\models\qwen-tts\Qwen3-TTS-12Hz-1.7B-VoiceDesign
+
+# 650.69 MB | folder | HF: Qwen/Qwen3-TTS-Tokenizer-12Hz | custom node | https://huggingface.co/Qwen/Qwen3-TTS-Tokenizer-12Hz
+D:\ComfyUI-Easy-Install\ComfyUI\models\qwen-tts\Qwen3-TTS-Tokenizer-12Hz
+
+# 234.74 MB | file | HF: Comfy-Org/stable-diffusion-3.5 | https://huggingface.co/Comfy-Org/stable-diffusion-3.5/resolve/main/text_encoders/clip_l.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\text_encoders\clip_l.safetensors
+
+# 12.30 GB | file | HF: Comfy-Org/ltx-2 | https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp8_scaled.safetensors
+D:\ComfyUI-Easy-Install\ComfyUI\models\text_encoders\gemma_3_12B_it_fp8_scaled.safetensors
+
+# 6.26 GB | file | not found online
+# D:\ComfyUI-Easy-Install\ComfyUI\models\text_encoders\qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors
+
+# 3.40 GB | file | HF: city96/umt5-xxl-encoder-gguf | https://huggingface.co/city96/umt5-xxl-encoder-gguf/resolve/main/umt5-xxl-encoder-Q4_K_M.gguf
+D:\ComfyUI-Easy-Install\ComfyUI\models\text_encoders\umt5-xxl-encoder-Q4_K_M.gguf
+
+# 362.65 MB | folder | HF: TencentGameMate/chinese-wav2vec2-base | custom node | https://huggingface.co/TencentGameMate/chinese-wav2vec2-base
+D:\ComfyUI-Easy-Install\ComfyUI\models\transformers\TencentGameMate\chinese-wav2vec2-base
+
+# 8.63 GB | folder | HF: openai/whisper-large-v3 | custom node | https://huggingface.co/openai/whisper-large-v3
+D:\ComfyUI-Easy-Install\ComfyUI\models\whisper\whisper-large-v3
+
+# 2.85 GB | folder | HF: openai/whisper-medium | custom node | https://huggingface.co/openai/whisper-medium
+D:\ComfyUI-Easy-Install\ComfyUI\models\whisper\whisper-medium
