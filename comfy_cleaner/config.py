@@ -37,7 +37,7 @@ DEFAULT_CONFIG: dict = {
     # for deletion. vae_approx holds the preview decoders ComfyUI uses without any
     # workflow naming them; insightface models are picked by face nodes automatically.
     "always_keep": ["vae_approx/*", "insightface/*"],
-    # Online verification of unused models.
+    # Online verification of orphaned and duplicate models.
     "verify_online": True,
     "use_civitai": True,
     # Hugging Face accounts whose complete file lists are indexed locally. Most

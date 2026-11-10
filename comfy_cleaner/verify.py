@@ -1,4 +1,4 @@
-"""Check unused models against Hugging Face and Civitai.
+"""Check orphaned and duplicate models against Hugging Face and Civitai.
 
 Results are stored in the local database, so a model that has been verified is
 never looked up online again, and models that were not found are only re-checked
@@ -73,6 +73,7 @@ class Verification:
             prefix = {"huggingface": "HF", "civitai": "Civitai"}.get(self.source, self.source)
             return f"{prefix}: {self.repo}"
         return {
+            "skipped": "",
             "name_only": "name found online, size differs",
             "not_found": "not found online",
             "not_checked": "not checked (offline)",

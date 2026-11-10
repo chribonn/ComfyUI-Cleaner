@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Delete unused models (dry run)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/delete_unused_models.py",
+            "args": ["--dry-run"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopOnEntry": true,
+            "justMyCode": true
+        },
+        {
+            "name": "Find unused models",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/find_unused_models.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopOnEntry": true,
+            "justMyCode": true
+        },
+        {
+            "name": "Python: current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
