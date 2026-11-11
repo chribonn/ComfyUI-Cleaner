@@ -1,5 +1,7 @@
 # ComfyUI-Cleaner
 
+**Version 1.0.0-beta.** This is a beta release: review the list carefully before you delete anything. See [Version](#version).
+
 ComfyUI-Cleaner compares your ComfyUI models with your workflows. It finds models that no workflow uses, files that exist in more than one place, and files that are in the wrong folder, and helps you delete or move them. Before a model is suggested for deletion, it is checked online so you know it can be downloaded again from Hugging Face or Civitai. The download links are kept in a log.
 
 The work is split into two programs:
@@ -76,6 +78,9 @@ Details:
 - **Moving**: a misplaced model can be moved only when all the workflows that look for it agree on one place, the folder is clear (some nodes read from more than one folder), and nothing exists there yet.
 - **Duplicates**: listed even when workflows use every copy. If a workflow uses or looks for the file, at least one copy has to stay. The list says whether the copies have the same size; same name with a different size may be a different model.
 - **Custom node folders** (any folder in `models` that is not one of ComfyUI's own, for example `qwen-tts` or `LLM`) are matched loosely by name, because custom nodes follow their own conventions. Their models are never misplaced and never pre-marked for deletion: custom nodes often load a model without the workflow naming it.
+- **Template models**: ComfyUI's own templates and blueprints are read too, but they are not your workflows, so they never make a model used. An orphan that one of them loads is a *template model*. Typically it was downloaded to try a template, and no saved workflow uses it. Template models are marked `T` in the review, named in the list with the templates and blueprints that load them, and highlighted at the top of the list. They are marked for deletion like other orphans; to keep them by default, run `find_unused_models.py --keep-template-models`. If a template loads a misplaced model from where it is now, its details warn that moving the model breaks that template. The files read are:
+  - blueprints: `ComfyUI\blueprints\*.json` and `custom_nodes\<pack>\subgraphs\*.json`
+  - templates: the Templates browser files (`comfyui_workflow_templates*\templates\*.json` in ComfyUI's Python folder: `python_embeded`, `venv` or `.venv`, next to or inside the ComfyUI folder) and the example workflows of custom nodes (`custom_nodes\<pack>\example_workflows\*.json`, or `example`, `examples`, `workflow`, `workflows`)
 - Models that match an `always_keep` pattern in the config are never listed.
 
 ### Online check
@@ -88,7 +93,7 @@ Orphans and duplicates are looked up online:
 
 Results are saved in `comfyui_cleaner.db`. A verified model is never looked up again. A model that was not found is looked up again after `recheck_unverified_days` (7 by default), or right away with `--recheck`.
 
-Only orphans verified online (and not in a custom node folder) are marked for deletion by default. Nothing is marked for moving by default.
+Only orphans verified online (and not in a custom node folder) are marked for deletion by default. This includes template models, unless you use `--keep-template-models`. Nothing is marked for moving by default.
 
 ### Reviewing the list
 
@@ -96,7 +101,7 @@ After the scan you get a numbered table in three sections:
 
 ```
 Orphaned models - no workflow uses them:
- 1 [x]   27.14 GB  checkpoints/ltx-2.3-22b-dev-fp8.safetensors       orphan    HF: Lightricks/LTX-2.3-fp8
+ 1 [x]   27.14 GB  checkpoints/ltx-2.3-22b-dev-fp8.safetensors      T orphan    HF: Lightricks/LTX-2.3-fp8
  2 [ ]    4.10 GB  LLM/some-model/                                  ! orphan    not found online
 
 Duplicates - the same name in more than one place:
@@ -107,7 +112,7 @@ Misplaced models - a workflow names them but looks in another folder:
  5 [m]    5.78 GB  diffusion_models/z_image_turbo_int8_convrot.safetensors  misplaced wants it in diffusion_models/z-image/
 ```
 
-`[x]` = delete, `[m]` = move, `[ ]` = keep. `dupN` marks the copies of one file (`*` = the sizes differ). `!` marks a model in a custom node folder.
+`[x]` = delete, `[m]` = move, `[ ]` = keep. `dupN` marks the copies of one file (`*` = the sizes differ). `!` marks a model in a custom node folder. `T` marks a template model: only ComfyUI's own templates or blueprints load it, none of your workflows.
 
 | Command | Action |
 |---|---|
@@ -115,8 +120,8 @@ Misplaced models - a workflow names them but looks in another folder:
 | `m 4` | Switch misplaced model 4 between move `[m]` and keep `[ ]` |
 | `a` | Mark all orphans for deletion |
 | `n` | Keep everything (also clears moves) |
-| `v` | Mark only orphans verified online (the default) |
-| `i 4` | Show details of model 4: which workflows use it or where they expect it, its other copies, download link |
+| `v` | Back to the default: mark only orphans verified online (without template models if `--keep-template-models` is used) |
+| `i 4` | Show details of model 4: which workflows use it or where they expect it, which templates and blueprints load it, its other copies, download link |
 | `e` | Edit the list in a text editor (Notepad on Windows, otherwise `$EDITOR` or `nano`) |
 | `l` | Show the list again |
 | `h` | Show the help |
@@ -153,6 +158,8 @@ You then see the planned moves and deletions. Moves need a `y`; deletions need y
 | `--recheck` | Look up models online again that were not found before, even if `recheck_unverified_days` has not passed. |
 | `--show-used` | Also print the models that are used, by which workflows, and where other workflows expect them. |
 | `--no-edit` | Save the list without the interactive review. The default selection is used. |
+| `--keep-template-models` | Do not mark template models (orphans that only ComfyUI's own templates or blueprints load) for deletion by default. They are still listed, and you can mark them yourself. |
+| `--version` | Show the version and exit. |
 | `-h`, `--help` | Show the help and exit. |
 
 ### delete_unused_models.py
@@ -162,6 +169,7 @@ You then see the planned moves and deletions. Moves need a `y`; deletions need y
 | `--config CONFIG` | Configuration file to use. Default: `comfyui_cleaner_config.json` in the program folder. |
 | `--list LIST` | List to carry out. Default: `unused_models.txt` in the program folder. |
 | `--dry-run` | Only show what would be deleted and moved. Nothing is changed. |
+| `--version` | Show the version and exit. |
 | `-h`, `--help` | Show the help and exit. |
 
 ### Examples
@@ -169,6 +177,9 @@ You then see the planned moves and deletions. Moves need a `y`; deletions need y
 ```powershell
 # Scan without internet, also showing which workflows use which models
 python find_unused_models.py --offline --show-used
+
+# Do not mark models that only ComfyUI's own templates or blueprints load
+python find_unused_models.py --keep-template-models
 
 # Point the program at a different ComfyUI installation
 python find_unused_models.py --reconfigure
@@ -185,12 +196,34 @@ python delete_unused_models.py --config remote.json --list remote_list.txt --dry
 - a path: the model is deleted
 - `MOVE <from> -> <to>`: the model is moved
 
-Each model has a comment line above it with its size, type, result, online status and download link.
+The first two lines say which version of ComfyUI-Cleaner wrote the list, when, and for which models folder:
+
+```
+# ComfyUI-Cleaner 1.0.0-beta - review list
+# Created 2026-11-11 10:30 for C:\ComfyUI\models
+```
+
+Each model has a comment line above it with its size, type, result, online status and download link. Template models get a second comment line that names the templates and blueprints that load them.
+
+If template models were found, a highlighted note at the top of the list says how many there are, how much space they take and whether they will be deleted:
+
+```
+# !!! ==========================================================================
+# !!! ATTENTION: models outside your workflows were found. 11 models (123.75 GB)
+# !!! are not used by any of your workflows, only by ComfyUI's own templates or
+# !!! blueprints (see "template model" below). They are marked for deletion by
+# !!! default and will be deleted. To keep them by default, run
+# !!! find_unused_models.py with --keep-template-models.
+# !!! ==========================================================================
+```
+
+The same note is printed when the list is saved.
 
 ```
 # ===== Orphaned models - no workflow uses them =====
 
-# 27.14 GB | file | orphan | HF: Lightricks/LTX-2.3-fp8 | https://huggingface.co/...
+# 27.14 GB | file | orphan (template model: only 2 blueprints and 5 templates load it) | HF: Lightricks/LTX-2.3-fp8 | https://huggingface.co/...
+#   loaded by: blueprint "Image to Video (LTX-2.3)", blueprint "Text to Video (LTX-2.3)", template "template_image_speech_to_video" (+4 more)
 C:\ComfyUI\models\checkpoints\ltx-2.3-22b-dev-fp8.safetensors
 
 # ===== Duplicates - the same name in more than one place =====
@@ -203,7 +236,8 @@ C:\ComfyUI\models\loras\old\some_lora.safetensors
 
 # ===== Misplaced models - a workflow names them but looks in another folder =====
 
-# 5.78 GB | file | misplaced, expected at diffusion_models/z-image/z_image_turbo_int8_convrot.safetensors
+# 5.78 GB | file | misplaced, expected at diffusion_models/z-image/z_image_turbo_int8_convrot.safetensors | also loaded here by 1 template
+#   moving it breaks: template "image_z_image_turbo_int8"
 # MOVE C:\ComfyUI\models\diffusion_models\z_image_turbo_int8_convrot.safetensors -> C:\ComfyUI\models\diffusion_models\z-image\z_image_turbo_int8_convrot.safetensors
 ```
 
@@ -240,6 +274,12 @@ All files are stored in the program folder:
 | `comfyui_cleaner_config.json` | Your settings and API keys |
 | `comfyui_cleaner.db` | Cache of online checks, file hashes and the Hugging Face index (shared by all configs) |
 | `unused_models.txt` | The review list |
-| `deletion_log.txt` | Tab-separated log: time, `DELETED`/`MOVED`/`FAILED`, size in bytes, path, then the download link, new location or error |
+| `deletion_log.txt` | Tab-separated log: time, `DELETED`/`MOVED`/`FAILED`, size in bytes, path, the download link, new location or error, then the ComfyUI-Cleaner version (e.g. `ComfyUI-Cleaner 1.0.0-beta`) |
 
 You can delete `comfyui_cleaner.db` at any time. The next scan will look everything up online again. The download links in `deletion_log.txt` come from this database, so run a new scan before deleting if you removed it.
+
+## Version
+
+This is version 1.0.0-beta, a beta release. The version is set in one place, `comfy_cleaner/version.py`, and both programs take it from there. It is shown when a program starts and with `--version`, written at the top of `unused_models.txt` and in every line of `deletion_log.txt`, and sent as the User-Agent of the online lookups. Lines that older copies wrote to `deletion_log.txt` have no version.
+
+The version is not stored in `comfyui_cleaner_config.json`, so you can upgrade by replacing the program files and keep your settings. When you change the version, also change it at the top of this README.

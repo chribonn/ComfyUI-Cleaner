@@ -39,12 +39,32 @@ _DOCUMENT_RE = re.compile(r"<(?:h[1-6]|p|div|span|br|hr|ul|ol|li|a|table|b|stron
 _WIDGET_KEYS = ("widgets_values", "widgets_values_named")
 
 
-def _file_name_regex(extensions: list[str]) -> re.Pattern[str]:
-    exts = sorted({e.lower().lstrip(".") for e in extensions}, key=len, reverse=True)
-    return re.compile(
-        r"[^\s\"'<>|*?:,;()\[\]{}=]+\.(?:" + "|".join(map(re.escape, exts)) + r")(?![a-z0-9])",
-        re.IGNORECASE,
-    )
+# A run of characters that can be part of a model path.
+_PATH_RUN_RE = re.compile(r"[^\s\"'<>|*?:,;()\[\]{}=]+")
+
+
+class FileNameFinder:
+    """Finds model file names (by extension) in text.
+
+    Same result as the pattern  [^delimiters]+\\.(extension)(?![a-z0-9])  : per run of
+    path characters, the text from its start up to its last model extension. That
+    single pattern backtracks quadratically on long runs without an extension (some
+    example workflows embed strings of ~100,000 characters), so it is done in two
+    linear steps.
+    """
+
+    def __init__(self, extensions: list[str]):
+        exts = sorted({e.lower().lstrip(".") for e in extensions}, key=len, reverse=True)
+        self._ext_re = re.compile(
+            r"\.(?:" + "|".join(map(re.escape, exts)) + r")(?![a-z0-9])", re.IGNORECASE)
+
+    def find(self, text: str):
+        for run in _PATH_RUN_RE.findall(text):
+            last = None
+            for last in self._ext_re.finditer(run):
+                pass
+            if last is not None and last.start() > 0:
+                yield run[:last.end()]
 
 
 def normalize(text: str) -> str:
@@ -187,10 +207,10 @@ def _iter_strings(obj: object):
 
 
 class _Scanner:
-    def __init__(self, refs: WorkflowRefs, workflow: str, file_re: re.Pattern[str]):
+    def __init__(self, refs: WorkflowRefs, workflow: str, file_names: FileNameFinder):
         self.refs = refs
         self.workflow = workflow
-        self.file_re = file_re
+        self.file_names = file_names
 
     def mention(self, value: str) -> None:
         text = value.strip()
@@ -198,8 +218,8 @@ class _Scanner:
             return
         if len(text) <= _MAX_NAME_LEN and "\n" not in text:
             self.refs.add_mention(text, self.workflow)
-        for match in self.file_re.finditer(normalize(text)):
-            self.refs.add_mention(match.group(0), self.workflow)
+        for name in self.file_names.find(normalize(text)):
+            self.refs.add_mention(name, self.workflow)
         for match in _URL_RE.finditer(text):
             self._url_path(match.group(0), self.refs.add_mention)
         for regex in (_EMBEDDING_RE, _LORA_TAG_RE):
@@ -227,8 +247,8 @@ class _Scanner:
         rest = _URL_RE.sub(" ", text)
         if rest == text and len(text) <= _MAX_NAME_LEN and "\n" not in text:
             add(text, node, wf, categories)
-        for match in self.file_re.finditer(normalize(rest)):
-            add(match.group(0), node, wf, categories)
+        for name in self.file_names.find(normalize(rest)):
+            add(name, node, wf, categories)
         for match in _LORA_TAG_RE.finditer(rest):
             add(match.group(1), node, wf, ("loras",))
         for match in _EMBEDDING_RE.finditer(rest):
@@ -275,23 +295,35 @@ class _Scanner:
                     stack.extend(current.values())
 
 
+def _read_workflow(refs: WorkflowRefs, label: str, path: Path, file_names: FileNameFinder) -> None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig", errors="replace"))
+    except (OSError, ValueError) as exc:
+        refs.skipped.append((label, f"could not be read ({exc})"))
+        return
+    if not is_workflow(data):
+        refs.ignored_json += 1
+        return
+    refs.workflows.append(label)
+    _Scanner(refs, label, file_names).walk(data)
+
+
 def scan_workflows(user_dir: Path, extensions: list[str]) -> WorkflowRefs:
     refs = WorkflowRefs()
-    file_re = _file_name_regex(extensions)
+    file_names = FileNameFinder(extensions)
     for path in sorted(user_dir.rglob("*.json")):
         rel_parts = path.relative_to(user_dir).parts
         if any(part.startswith(".") for part in rel_parts):
             continue
-        rel = "/".join(rel_parts)
-        try:
-            data = json.loads(path.read_text(encoding="utf-8-sig", errors="replace"))
-        except (OSError, ValueError) as exc:
-            refs.skipped.append((rel, f"could not be read ({exc})"))
-            continue
-        if not is_workflow(data):
-            refs.ignored_json += 1
-            continue
-        refs.workflows.append(rel)
-        _Scanner(refs, rel, file_re).walk(data)
+        _read_workflow(refs, "/".join(rel_parts), path, file_names)
+    return refs
+
+
+def scan_files(files: list[tuple[str, Path]], extensions: list[str]) -> WorkflowRefs:
+    """Read the given (label, path) workflow files, e.g. ComfyUI's templates and blueprints."""
+    refs = WorkflowRefs()
+    file_names = FileNameFinder(extensions)
+    for label, path in files:
+        _read_workflow(refs, label, path, file_names)
     return refs
 

@@ -4,6 +4,9 @@ Models a workflow loads from exactly their place are left alone. The review
 list shows orphaned models (no workflow uses them), duplicates (same name in
 more than one place) and misplaced models (a workflow looks for them in another
 folder), and lets the user choose what to delete or move.
+
+ComfyUI's own templates and blueprints are read too. They never make a model
+used, but orphans they load are flagged as template models.
 """
 
 from __future__ import annotations
@@ -13,27 +16,36 @@ import os
 import shlex
 import shutil
 import subprocess
+import textwrap
 from pathlib import Path
 
 from .config import DB_PATH, DEFAULT_CONFIG_PATH, DEFAULT_LIST_PATH, Settings, load_settings
 from .database import ModelDatabase
 from .listfile import (SECTION_TITLES, ListEntry, norm_path, plural, read_list, section_of,
-                       sort_entries, status_text, write_list)
-from .models import MISPLACED, ORPHAN, USED, ModelStatus, classify, inventory
+                       sort_entries, status_text, template_counts, template_names,
+                       template_notice, write_list)
+from .models import MISPLACED, ORPHAN, USED, ModelStatus, add_template_users, classify, inventory
+from .templates import find_template_files, is_blueprint
 from .util import ask, ask_yes_no, human_size, setup_console
 from .verify import Verification, verify_units
-from .workflows import scan_workflows
+from .version import VERSION_TEXT
+from .workflows import scan_files, scan_workflows
 
 HELP = """Commands:
   1,3,5-8   switch the listed numbers between delete [x] and keep [ ]
   m 4       switch misplaced model 4 between move [m] and keep [ ]
   a         delete all orphans        n   keep everything (also clears moves)
-  v         delete only orphans verified online (the default)
+  v         back to the default: delete {default}
   i 4       show details of model 4
   e         edit the list in a text editor
   l         show the list again
   Enter     save the list and finish
   q         quit without saving"""
+
+
+def help_text(keep_templates: bool) -> str:
+    default = "orphans verified online" + (", except template models" if keep_templates else "")
+    return HELP.format(default=default)
 
 
 def _fit(text: str, width: int) -> str:
@@ -63,7 +75,7 @@ def mark(entry: ListEntry) -> str:
     return "[x]" if entry.delete else "[m]" if entry.move else "[ ]"
 
 
-def print_table(entries: list[ListEntry]) -> None:
+def print_table(entries: list[ListEntry], keep_templates: bool = False) -> None:
     columns = shutil.get_terminal_size((120, 30)).columns
     num_w = len(str(len(entries)))
     status_w = max(len(short_status(e.model)) for e in entries)
@@ -77,7 +89,7 @@ def print_table(entries: list[ListEntry]) -> None:
             print(f"\n{SECTION_TITLES[section]}:")
         unit = entry.unit
         rel = unit.rel + ("/" if unit.kind == "folder" else "")
-        flag = "!" if entry.model.custom else " "
+        flag = "!" if entry.model.custom else "T" if entry.model.template_model else " "
         print(f"{number:>{num_w}} {mark(entry)} {human_size(unit.size):>10}  "
               f"{_fit(rel, path_w):<{path_w}}{flag} {short_status(entry.model):<{status_w}} "
               f"{_fit_end(info_text(entry), info_w)}")
@@ -90,6 +102,10 @@ def print_table(entries: list[ListEntry]) -> None:
     if any(e.model.custom for e in entries):
         print("!    = custom node model folder. Custom nodes often load these by themselves "
               "without naming them in the workflow, so check before deleting.")
+    if any(e.model.template_model and not e.model.custom for e in entries):
+        print("T    = template model: only ComfyUI's own templates or blueprints load it, none of your "
+              "workflows. " + ("Not marked by default (--keep-template-models)." if keep_templates
+                               else "Marked like other orphans; --keep-template-models keeps them."))
 
 
 def parse_numbers(text: str, count: int) -> set[int]:
@@ -117,8 +133,10 @@ def parse_numbers(text: str, count: int) -> set[int]:
 
 
 # ------------------------------------------------------------------ selection rules
-def default_delete(entry: ListEntry, verify_enabled: bool) -> bool:
+def default_delete(entry: ListEntry, verify_enabled: bool, keep_templates: bool = False) -> bool:
     model = entry.model
+    if keep_templates and model.template_model:
+        return False
     return (model.status == ORPHAN and not model.custom
             and (entry.verification.verified or not verify_enabled))
 
@@ -160,6 +178,16 @@ def warn_if_used(entry: ListEntry) -> None:
               "Point them at the other copy after deleting it.")
 
 
+def warn_if_template_move(entry: ListEntry) -> None:
+    templates = entry.model.templates
+    if entry.move and templates:
+        names = template_names(templates)
+        one = len(names) == 1
+        print(f"  Note: {template_counts(templates)} of ComfyUI {'loads' if one else 'load'} it from "
+              f"where it is now ({names[0]}{' ...' if not one else ''}). "
+              f"Moving the model breaks {'it' if one else 'them'}.")
+
+
 def show_details(entries: list[ListEntry], entry: ListEntry) -> None:
     unit, model, check = entry.unit, entry.model, entry.verification
     print(f"\n  Path:      {unit.path}")
@@ -178,6 +206,20 @@ def show_details(entries: list[ListEntry], entry: ListEntry) -> None:
     if model.status == ORPHAN and model.mentions:
         print(f"  Named in:  {sorted(model.mentions)[0]}"
               f"{f' (+{len(model.mentions) - 1} more)' if len(model.mentions) > 1 else ''}")
+    if model.templates:
+        names = template_names(model.templates)
+        one = len(names) == 1
+        counts, verb = template_counts(model.templates), "loads" if one else "load"
+        if model.template_model:
+            print(f"  Templates: only ComfyUI's own {counts} {verb} it, none of your workflows:")
+        else:
+            print(f"  Templates: {counts} of ComfyUI also {verb} it from where it is now:")
+        for name in names[:8]:
+            print(f"             {name}")
+        if len(names) > 8:
+            print(f"             ... and {len(names) - 8} more")
+        if model.status == MISPLACED:
+            print(f"             Moving the model breaks {'it' if one else 'them'}.")
     if model.is_duplicate:
         print(f"  Copies:    duplicate {model.dup_group}"
               f"{'' if model.dup_same_size else ' (sizes differ)'}")
@@ -257,10 +299,11 @@ def apply_edited_list(entries: list[ListEntry], list_path: Path) -> None:
             print(f"  {item}")
 
 
-def review(entries: list[ListEntry], list_path: Path, settings: Settings, verify_enabled: bool) -> bool:
+def review(entries: list[ListEntry], list_path: Path, settings: Settings, verify_enabled: bool,
+           keep_templates: bool = False) -> bool:
     """Interactive editing. Returns False if the user quits without saving."""
-    print_table(entries)
-    print("\n" + HELP)
+    print_table(entries, keep_templates)
+    print("\n" + help_text(keep_templates))
     while True:
         command = ask("\nCommand (h = help, Enter = save): ")
         lower = command.lower()
@@ -269,10 +312,10 @@ def review(entries: list[ListEntry], list_path: Path, settings: Settings, verify
         if lower in ("q", "quit", "exit"):
             return False
         if lower in ("h", "help", "?"):
-            print(HELP)
+            print(help_text(keep_templates))
             continue
         if lower in ("l", "list"):
-            print_table(entries)
+            print_table(entries, keep_templates)
             continue
         if lower in ("a", "v", "n"):
             for entry in entries:
@@ -281,14 +324,14 @@ def review(entries: list[ListEntry], list_path: Path, settings: Settings, verify
                 elif lower == "a":
                     entry.delete = entry.model.status == ORPHAN
                 else:
-                    entry.delete = default_delete(entry, verify_enabled)
-            print_table(entries)
+                    entry.delete = default_delete(entry, verify_enabled, keep_templates)
+            print_table(entries, keep_templates)
             continue
         if lower == "e":
-            write_list(list_path, entries, settings.models_dir)
+            write_list(list_path, entries, settings.models_dir, keep_templates)
             open_in_editor(list_path)
             apply_edited_list(entries, list_path)
-            print_table(entries)
+            print_table(entries, keep_templates)
             continue
         if lower[:1] in ("i", "m"):
             try:
@@ -306,8 +349,9 @@ def review(entries: list[ListEntry], list_path: Path, settings: Settings, verify
                     print(f"  {index + 1} {problem}")
                 else:
                     entry.move, entry.delete = True, False
+                    warn_if_template_move(entry)
             if lower[0] == "m":
-                print_table(entries)
+                print_table(entries, keep_templates)
             continue
         try:
             indexes = parse_numbers(lower, len(entries))
@@ -323,13 +367,14 @@ def review(entries: list[ListEntry], list_path: Path, settings: Settings, verify
             else:
                 entry.delete, entry.move = True, False
                 warn_if_used(entry)
-        print_table(entries)
+        print_table(entries, keep_templates)
 
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compare ComfyUI models with the workflows and list orphaned, duplicate and "
-                    "misplaced models, so they can be deleted or moved with delete_unused_models.py.")
+        description=f"{VERSION_TEXT}. Compare ComfyUI models with the workflows and list orphaned, "
+                    "duplicate and misplaced models, so they can be deleted or moved with "
+                    "delete_unused_models.py.")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH,
                         help="configuration file (default: %(default)s)")
     parser.add_argument("--list", type=Path, default=DEFAULT_LIST_PATH,
@@ -344,6 +389,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="also print the models that are used and by which workflows")
     parser.add_argument("--no-edit", action="store_true",
                         help="save the list without the interactive review")
+    parser.add_argument("--keep-template-models", action="store_true",
+                        help="do not mark template models (orphans that only ComfyUI's own templates "
+                             "or blueprints load) for deletion by default")
+    parser.add_argument("--version", action="version", version=VERSION_TEXT,
+                        help="show the version and exit")
     return parser.parse_args(argv)
 
 
@@ -356,6 +406,10 @@ def print_summary(result, units) -> None:
     line("used by a workflow:", result.with_status(USED))
     line("misplaced:", result.with_status(MISPLACED), "  (a workflow looks for them in another folder)")
     line("orphaned:", result.with_status(ORPHAN), "  (no workflow uses them)")
+    template_models = [m for m in result.statuses if m.template_model]
+    if template_models:
+        line("  template models:", template_models,
+             "  (only ComfyUI's own templates or blueprints load them)")
     groups = result.duplicate_groups
     if groups:
         copies = [m for members in groups.values() for m in members]
@@ -368,6 +422,7 @@ def print_summary(result, units) -> None:
 def main(argv: list[str] | None = None) -> int:
     setup_console()
     args = parse_args(argv)
+    print(f"{VERSION_TEXT} - find unused models")
     settings = load_settings(args.config, reconfigure=args.reconfigure)
     list_path = args.list.resolve()
     print(f"\nWorkflows: {settings.user_dir}")
@@ -383,10 +438,23 @@ def main(argv: list[str] | None = None) -> int:
         if args.no_edit or not ask_yes_no("Continue anyway?"):
             return 1
 
+    templates = find_template_files(settings.comfyui_dir)
+    template_refs = scan_files(templates.files, settings.extensions)
+    blueprints = sum(1 for label in template_refs.workflows if is_blueprint(label))
+    print(f"Read {plural(blueprints, 'blueprint')} and "
+          f"{plural(len(template_refs.workflows) - blueprints, 'template')} that come with ComfyUI "
+          "and its custom nodes. They do not count as use.")
+    if template_refs.skipped:
+        print(f"  {plural(len(template_refs.skipped), 'template file')} could not be read.")
+    if not templates.package_dirs:
+        print("  ComfyUI's Templates browser files were not found (no comfyui_workflow_templates "
+              f"package in a Python environment next to {settings.comfyui_dir}).")
+
     units, warnings = inventory(settings.models_dir, settings.extensions)
     for warning in warnings:
         print(f"  {warning}")
     result = classify(units, refs, settings.keep_patterns, settings.models_dir)
+    add_template_users(result, template_refs)
     print_summary(result, units)
 
     if args.show_used:
@@ -408,22 +476,28 @@ def main(argv: list[str] | None = None) -> int:
                               online=verify_enabled and not args.offline, recheck=args.recheck)
     entries = sort_entries([ListEntry(m, checks.get(m.unit.rel, Verification("skipped")))
                             for m in listed])
+    keep_templates = args.keep_template_models
     for entry in entries:
-        entry.delete = default_delete(entry, verify_enabled)
+        entry.delete = default_delete(entry, verify_enabled, keep_templates)
 
     if not entries:
         print("\nEvery model is used by a workflow from exactly its place - nothing to review.")
     elif not args.no_edit:
-        if not review(entries, list_path, settings, verify_enabled):
+        if not review(entries, list_path, settings, verify_enabled, keep_templates):
             print("Quit without saving. The previous list (if any) was not changed.")
             return 0
-    write_list(list_path, entries, settings.models_dir)
+    write_list(list_path, entries, settings.models_dir, keep_templates)
 
     deletes = [e for e in entries if e.delete]
     moves = [e for e in entries if e.move]
     print(f"\nSaved the list to {list_path}")
     print(f"Marked: {len(deletes)} model(s) to delete ({human_size(sum(e.unit.size for e in deletes))}), "
           f"{len(moves)} to move.")
+    notice = template_notice(entries, keep_templates, 'marked "template model" in the list')
+    if notice:
+        print()
+        for line in textwrap.wrap(notice, 96):
+            print(f"!!! {line}")
     if deletes or moves:
         extra = "" if list_path == DEFAULT_LIST_PATH.resolve() else f' --list "{list_path}"'
         print(f"To carry this out run:  python delete_unused_models.py{extra}   (add --dry-run to preview)")

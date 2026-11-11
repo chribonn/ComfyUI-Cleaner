@@ -12,6 +12,8 @@ Every model gets one status:
              no copy is there. It is never deleted; it can be moved instead.
   orphan     no workflow uses it
 and models with the same name in more than one place are marked as duplicates.
+Orphans that only ComfyUI's own templates or blueprints load are "template
+models" (add_template_users): still orphans, but flagged in the review.
 
 Files in ComfyUI's own model folders are matched strictly: path inside the model
 folder plus the folder the node reads from. Custom node folders and model folders
@@ -57,10 +59,17 @@ class ModelStatus:
     other_copy_used: bool = False  # orphans: the workflows that name it use another copy
     dup_group: int = 0             # > 0: same name exists elsewhere (group number)
     dup_same_size: bool = True
+    # ComfyUI templates/blueprints that load this copy (labels). They never make it used.
+    templates: set[str] = field(default_factory=set)
 
     @property
     def is_duplicate(self) -> bool:
         return self.dup_group > 0
+
+    @property
+    def template_model(self) -> bool:
+        """An orphan that only ComfyUI's own templates or blueprints load."""
+        return self.status == ORPHAN and bool(self.templates)
 
     @property
     def deletable(self) -> bool:
@@ -314,3 +323,17 @@ def classify(units: list[ModelUnit], refs: WorkflowRefs, keep_patterns: list[str
             status.dup_group = number
             status.dup_same_size = same_size
     return Classification(statuses, kept)
+
+
+def add_template_users(result: Classification, refs: WorkflowRefs) -> None:
+    """Note which of ComfyUI's templates and blueprints load each model from its place.
+
+    They are matched like workflows (strictly in ComfyUI's model folders, by name
+    elsewhere), but only explain why a model is there: they never make it used.
+    """
+    for status in result.statuses:
+        unit = status.unit
+        if _location(unit) is None:
+            status.templates = refs.mentions_of(unit.kind, unit.name)
+        else:
+            status.templates = {r.workflow for r in refs.refs_named(unit.name) if is_exact(r, unit)}

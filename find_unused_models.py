@@ -5,7 +5,10 @@ more than one place) and misplaced models (a workflow looks for them in another
 folder), so they can be deleted or moved with delete_unused_models.py.
 
 Usage:  python find_unused_models.py [--offline] [--recheck] [--show-used] [--no-edit]
-                                     [--reconfigure] [--config FILE] [--list FILE]
+                                     [--keep-template-models] [--reconfigure]
+                                     [--config FILE] [--list FILE] [--version]
+
+The version is set in comfy_cleaner/version.py.
 """
 
 import sys

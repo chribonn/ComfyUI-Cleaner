@@ -28,13 +28,13 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from . import __version__
 from .config import Settings
 from .database import ModelDatabase
 from .models import ModelUnit
 from .util import human_size
+from .version import APP_NAME, __version__
 
-USER_AGENT = f"ComfyUI-Cleaner/{__version__}"
+USER_AGENT = f"{APP_NAME}/{__version__}"
 HF_API = "https://huggingface.co/api"
 HF_SITE = "https://huggingface.co"
 CIVITAI_BY_HASH = "https://civitai.com/api/v1/model-versions/by-hash"

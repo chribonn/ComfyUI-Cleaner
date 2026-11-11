@@ -31,6 +31,7 @@ from .listfile import norm_path, plural, read_list
 from .models import MISPLACED, ORPHAN, USED, Classification, ModelStatus, classify, inventory
 from .util import ask, ask_yes_no, human_size, setup_console
 from .verify import unit_key_size
+from .version import VERSION_TEXT
 from .workflows import scan_workflows
 
 
@@ -193,19 +194,22 @@ def move_model(move: Move) -> None:
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Delete and move the models listed by find_unused_models.py.")
+        description=f"{VERSION_TEXT}. Delete and move the models listed by find_unused_models.py.")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH,
                         help="configuration file (default: %(default)s)")
     parser.add_argument("--list", type=Path, default=DEFAULT_LIST_PATH,
                         help="list to carry out (default: %(default)s)")
     parser.add_argument("--dry-run", action="store_true",
                         help="only show what would be deleted and moved")
+    parser.add_argument("--version", action="version", version=VERSION_TEXT,
+                        help="show the version and exit")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     setup_console()
     args = parse_args(argv)
+    print(f"{VERSION_TEXT} - delete unused models\n")
     list_path = args.list.resolve()
     if not list_path.is_file():
         print(f"List not found: {list_path}\nRun find_unused_models.py first.")
@@ -264,7 +268,8 @@ def main(argv: list[str] | None = None) -> int:
     with open(LOG_PATH, "a", encoding="utf-8") as log:
         def write_log(action: str, model: ModelStatus, detail: str) -> None:
             stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            log.write(f"{stamp}\t{action}\t{model.unit.size}\t{model.unit.path}\t{detail}\n")
+            log.write(f"{stamp}\t{action}\t{model.unit.size}\t{model.unit.path}\t{detail}"
+                      f"\t{VERSION_TEXT}\n")
 
         if checked.moves and ask_yes_no(f"\nMove these {plural(len(checked.moves), 'model')}?"):
             for move in checked.moves:
