@@ -1,5 +1,7 @@
 # ComfyUI-Cleaner
 
+![ComfyUI-Cleaner logo](Images/ComfyUI%20Cleaner_Logo.png)
+
 **Version 1.0.0-beta.** This is a beta release: review the list carefully before you delete anything. See [Version](#version).
 
 ComfyUI-Cleaner compares your ComfyUI models with your workflows. It finds models that no workflow uses, files that exist in more than one place, and files that are in the wrong folder, and helps you delete or move them. Before a model is suggested for deletion, it is checked online so you know it can be downloaded again from Hugging Face or Civitai. The download links are kept in a log.
